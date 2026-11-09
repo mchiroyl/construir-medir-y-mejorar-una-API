@@ -1,0 +1,6 @@
+.dsn
+.env
+.venv/
+__pycache__/
+PROMPT.md
+~$*

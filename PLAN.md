@@ -1,0 +1,9 @@
+# Plan cerrado antes de medir
+Demanda sintética de una sede pequeña: cinco operaciones/s; 12 consultas de disponibilidad, 5 listados y 3 creaciones por ciclo de 20. No es una predicción de producción. Una solicitud por iteración. Fechas deterministas, mismo intervalo libre u ocupado según el recurso. Listado de las dos primeras páginas de diez filas.
+ 
+Humo 1/s × 20 s; sostenida 5/s × 60 s (tres repeticiones por versión); estrés por escalones de 20 s a 2, 5, 10, 15 y 2/s. El último observa recuperación. Estas ventanas permiten 300 observaciones por repetición sostenida y acotan el ejercicio local. Tope 20 VUs; estrés divide en escenarios secuenciales con 2 VUs precargados y máximo 4 por etapa, hasta 20 reservados en el conjunto de cinco escenarios. Timeout 2 s. Solo loopback. Humo y sostenida usan 4 VUs iniciales y 16 máximos.
+ 
+Aprobación: p95 < 300 ms lectura y < 500 ms creación; se concede más margen a la escritura transaccional. Errores HTTP inesperados < 1 %, checks ≥ 99 %, cero descartes; ningún traslape en regresión. Se informa p99 sin convertirlo en SLO. En estrés se evalúa también el p95 global de la fase de recuperación < 300 ms. Límite de seguridad: cancelar si RAM disponible < 2 GiB o CPU host > 90 % durante 10 s, o si la tasa acumulada de error HTTP supera 5 % a partir de los primeros 10 s. Verificar recuperación con humo si se corta. Guardar también corridas fallidas.
+ 
+Mismo hardware, seed de 80 salas y 80 000 reservas, pool de 2–8 conexiones y 8 hilos. Antes de cada corrida retirar solo escrituras de prueba, reiniciar identidad, VACUUM ANALYZE y 5 listados de calentamiento. No vaciar la caché del sistema. Comparar tres p95 por separado y sus medianas; si una variación domina la conclusión, ampliar repeticiones. Guardar métricas y recursos con marcas de tiempo. La capacidad solo se infiere dentro del rango ensayado.
+
