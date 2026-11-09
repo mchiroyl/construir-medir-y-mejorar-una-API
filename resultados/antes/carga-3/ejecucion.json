@@ -1,0 +1,19 @@
+{
+  "commit": "a1121622c7265b58056255b1591ededaa883e51c",
+  "comando": [
+    "C:\\Users\\HOST-CORE\\AppData\\Local\\Temp\\s15-k6\\k6-v2.3.0-windows-amd64\\k6.exe",
+    "run",
+    "--quiet",
+    "--address",
+    "127.0.0.1:0",
+    "-e",
+    "MODO=carga",
+    "--out",
+    "json=resultados\\antes\\carga-3\\serie.json.gz",
+    "k6/reservas.js"
+  ],
+  "inicio": "2026-11-09T15:15:56.761006+00:00",
+  "semilla": 80000,
+  "salida": 0,
+  "fin": "2026-11-09T15:16:57.077165+00:00"
+}

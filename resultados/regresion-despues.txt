@@ -1,0 +1,10 @@
+Libre al inicio: True; esperado True
+Dos altas concurrentes: [201, 409]; esperado [201, 409]
+Reservas persistidas: 1; esperado 1
+Disponibilidad posterior: False; esperado False
+Intervalo contiguo: 201; esperado 201
+Intervalo invertido: 400; esperado 400
+Recurso inexistente: 404; esperado 404
+Paginación inválida: 400; esperado 400
+Páginas completas y sin duplicados: 10; esperado 10
+Orden estable entre páginas: OK

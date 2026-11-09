@@ -1,0 +1,10 @@
+Limit  (cost=0.89..1.37 rows=10 width=28) (actual time=0.045..0.046 rows=10.00 loops=1)
+  Buffers: shared hit=1 read=3
+  ->  Index Scan using reservas_orden_inicio_id on reservas  (cost=0.42..3815.11 rows=80000 width=28) (actual time=0.043..0.045 rows=20.00 loops=1)
+        Index Searches: 1
+        Buffers: shared hit=1 read=3
+Planning:
+  Buffers: shared hit=142
+Planning Time: 0.229 ms
+Execution Time: 0.056 ms
+Recursos y reservas: (80, 80000)

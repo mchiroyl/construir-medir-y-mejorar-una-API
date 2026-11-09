@@ -1,0 +1,12 @@
+Fecha local: 2026-11-09 04:39:32 -06:00
+Procesador: 13th Gen Intel(R) Core(TM) i5-13420H
+Procesadores lógicos: 12
+RAM física: 15.71 GiB
+git: git version 2.55.0.windows.5
+Node.js: v24.19.0
+Docker CLI: Docker version 29.9.2, build a82e528
+k6 en PATH: False
+psql en PATH: False
+docker info (estado del motor):
+
+failed to connect to the docker API at npipe:////./pipe/dockerDesktopLinuxEngine; check if the path is correct and if the daemon is running: open //./pipe/dockerDesktopLinuxEngine: El sistema no puede encontrar el archivo especificado.

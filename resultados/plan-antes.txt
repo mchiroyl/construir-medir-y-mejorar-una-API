@@ -1,0 +1,13 @@
+Limit  (cost=3520.80..3520.82 rows=10 width=28) (actual time=11.837..11.839 rows=10.00 loops=1)
+  Buffers: shared hit=598
+  ->  Sort  (cost=3520.77..3720.77 rows=80000 width=28) (actual time=11.835..11.837 rows=20.00 loops=1)
+        Sort Key: inicio DESC, id DESC
+        Sort Method: top-N heapsort  Memory: 27kB
+        Buffers: shared hit=598
+        ->  Seq Scan on reservas  (cost=0.00..1392.00 rows=80000 width=28) (actual time=0.002..2.735 rows=80000.00 loops=1)
+              Buffers: shared hit=592
+Planning:
+  Buffers: shared hit=121
+Planning Time: 0.210 ms
+Execution Time: 11.859 ms
+Recursos y reservas: (80, 80000)

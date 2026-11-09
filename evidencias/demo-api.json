@@ -1,0 +1,37 @@
+[
+  {
+    "metodo": "GET",
+    "url": "http://127.0.0.1:8765/disponibilidad?recurso=80&inicio=2045-05-01T14%3A00%3A00Z&fin=2045-05-01T15%3A00%3A00Z",
+    "estado": 200,
+    "cuerpo": {
+      "disponible": true
+    }
+  },
+  {
+    "metodo": "POST",
+    "url": "http://127.0.0.1:8765/reservas",
+    "estado": 201,
+    "cuerpo": {
+      "fin": "2045-05-01T15:00:00+00:00",
+      "id": 80001,
+      "inicio": "2045-05-01T14:00:00+00:00",
+      "recurso": 80
+    }
+  },
+  {
+    "metodo": "GET",
+    "url": "http://127.0.0.1:8765/disponibilidad?recurso=80&inicio=2045-05-01T14%3A00%3A00Z&fin=2045-05-01T15%3A00%3A00Z",
+    "estado": 200,
+    "cuerpo": {
+      "disponible": false
+    }
+  },
+  {
+    "metodo": "POST",
+    "url": "http://127.0.0.1:8765/reservas",
+    "estado": 409,
+    "cuerpo": {
+      "error": "Horario ocupado"
+    }
+  }
+]
