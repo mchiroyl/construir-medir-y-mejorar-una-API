@@ -39,7 +39,7 @@ with (dest/"k6.txt").open("w",encoding="utf-8") as log,(dest/"recursos.csv").ope
             break
         # Linux clock ticks and per-process RSS; shared pages can be counted repeatedly.
         probe="awk '$2==\"(postgres)\" {t+=$14+$15;r+=$24} END {print t+0, r*4}' /proc/[0-9]*/stat 2>/dev/null"
-        pg=subprocess.run(["wsl","-d","Ubuntu","--","bash","-c",probe],capture_output=True,text=True,encoding="utf-8",errors="replace").stdout.strip().split()
+        pg=subprocess.run(["wsl","-d","Ubuntu","--","bash","-s"],input=probe+chr(10),capture_output=True,text=True,encoding="utf-8",errors="replace").stdout.strip().split()
         cpu=psutil.cpu_percent()
         free=psutil.virtual_memory().available/2**30
         try:
@@ -59,4 +59,5 @@ meta["fin"]=datetime.now(timezone.utc).isoformat()
 (dest/"ejecucion.json").write_text(json.dumps(meta,indent=2),encoding="utf-8")
 print(dest, meta["salida"],flush=True)
 raise SystemExit(0 if meta["salida"]==0 else 1)
+
 
