@@ -22,7 +22,7 @@ for _ in range(5):
 exe=os.environ.get("K6_BIN") or shutil.which("k6")
 raw=dest/"serie.json.gz"
 command=[exe,"run","--quiet","--address","127.0.0.1:0","-e","MODO="+args.modo,"--out","json="+str(raw),"k6/reservas.js"]
-api_pid=next(x.pid for x in psutil.net_connections(kind="tcp") if x.laddr.port==8765 and x.status=="LISTEN")
+api_pid=next(x.pid for x in psutil.net_connections(kind="tcp") if x.laddr.port==8765 and not x.raddr)
 api=psutil.Process(api_pid)
 api.cpu_percent();psutil.cpu_percent()
 meta=dict(commit=subprocess.check_output(["git","rev-parse","HEAD"],text=True).strip(),comando=command,inicio=datetime.now(timezone.utc).isoformat(),semilla=80000)
@@ -59,3 +59,4 @@ meta["fin"]=datetime.now(timezone.utc).isoformat()
 (dest/"ejecucion.json").write_text(json.dumps(meta,indent=2),encoding="utf-8")
 print(dest, meta["salida"],flush=True)
 raise SystemExit(0 if meta["salida"]==0 else 1)
+
