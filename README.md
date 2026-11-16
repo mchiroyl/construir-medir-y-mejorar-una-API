@@ -2,7 +2,156 @@
 
 Proyecto individual de Marvin Chiroy Lopreto, carné 2890-22-20336. El informe editable y el video se entregan en este repositorio. El protocolo previo está en PLAN.md. Los archivos originales se encuentran en resultados/ y las capturas en evidencias/.
 
-## Preparar el laboratorio
+## Reiniciar en la PC de la entrega
+
+Usa tres ventanas. **A** controla PostgreSQL en Ubuntu, **B** mantiene la API abierta y **C** sirve para las pruebas. Los bloques de PowerShell empiezan en Windows, donde el indicador de la consola comienza con `PS`. Copia solo las líneas de los bloques. En una instalación nueva, completa primero el apartado **Instalación inicial** al final.
+
+### 1. Detener el laboratorio anterior
+
+1. **Ventana C, pruebas.** Si k6 está midiendo, espera a que termine y regrese el indicador `PS` para que escriba el resultado.
+2. **Ventana B, API.** En la consola que ejecuta `python .\app.py`, pulsa **Ctrl+C** una vez. Si la API ya está apagada, continúa.
+3. **Ventana A.** Si ves `Password:`, pulsa **Ctrl+C**. Si ves un indicador de Ubuntu terminado en `$`, escribe `exit` para regresar a PowerShell. Desde **PowerShell**, en cualquier carpeta, detén la instancia de PostgreSQL del laboratorio y comprueba su estado:
+
+~~~powershell
+wsl -d Ubuntu -u root -- pg_ctlcluster 18 main stop
+wsl -d Ubuntu -- pg_lsclusters
+Get-NetTCPConnection -State Listen -LocalPort 8765 -ErrorAction SilentlyContinue
+~~~
+
+El clúster `18 main` debe mostrar `down` y el último comando debe volver al indicador sin listar un proceso. Si el clúster ya estaba detenido, basta con verificar su estado. Este apagado conserva las reservas, el índice y las evidencias. Puedes cerrar las ventanas del laboratorio aquí si ya terminaste.
+
+### 2. Iniciar PostgreSQL
+
+**Ventana A · PowerShell · cualquier carpeta.** En la PC de la entrega, empieza aquí si el laboratorio ya está apagado:
+
+~~~powershell
+wsl -d Ubuntu -u root -- pg_ctlcluster 18 main start
+wsl -d Ubuntu -- pg_isready -h 127.0.0.1 -p 5432
+~~~
+
+Espera la respuesta `accepting connections`. Ahora deja una sesión de Ubuntu abierta en esta ventana para mantener WSL activo:
+
+~~~powershell
+wsl -d Ubuntu
+~~~
+
+### 3. Iniciar la API
+
+**Ventana B · abre otra PowerShell.** Sitúate en la carpeta exacta del proyecto. Las comillas y `-LiteralPath` permiten usar los espacios y los corchetes del nombre.
+
+~~~powershell
+Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+python .\app.py
+~~~
+
+Deja esta ventana abierta aunque la pantalla quede en silencio. En una consola que indique que el puerto 8765 está ocupado, comprueba el estado con el paso 4 antes de intentar otro arranque.
+
+### 4. Comprobar la API
+
+**Ventana C · abre una tercera PowerShell.** Usa esta ventana y esta carpeta para todos los comandos restantes de la práctica:
+
+~~~powershell
+$proyecto = 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+Set-Location -LiteralPath $proyecto
+Invoke-RestMethod 'http://127.0.0.1:8765/salud'
+(Invoke-RestMethod 'http://127.0.0.1:8765/reservas?pagina=1&limite=2').reservas | Format-Table id,recurso,inicio,fin
+~~~
+
+Continúa cuando veas `estado ok` y dos filas. Los identificadores dependen de las reservas que existan en ese momento.
+
+### 5. Ejecutar la regresión y seleccionar k6
+
+**Ventana C · PowerShell · raíz del proyecto.** La regresión crea reservas de prueba y comprueba, entre otras cosas, que dos altas simultáneas dejan una sola fila.
+
+~~~powershell
+python .\scripts\regresion.py
+~~~
+
+Espera `Reservas persistidas: 1; esperado 1` y `Orden estable entre páginas: OK`. Selecciona el mismo k6 2.3.0 utilizado para el informe:
+
+~~~powershell
+$env:K6_BIN = Join-Path $env:TEMP 's15-k6\k6-v2.3.0-windows-amd64\k6.exe'
+if (-not (Test-Path -LiteralPath $env:K6_BIN)) { throw 'Localiza k6.exe de la versión 2.3.0 y asigna su ruta a $env:K6_BIN.' }
+& $env:K6_BIN version
+~~~
+
+Si descargaste k6 en otra carpeta, sustituye la primera línea por la ruta real de tu ejecutable. Comprueba que la salida muestre `v2.3.0`.
+
+### 6. Ejecutar humo y leer el resultado en español
+
+**Ventana C · misma sesión PowerShell · raíz del proyecto.** Este bloque mide la versión corregida instalada en la PC de la entrega. Cada medición restablece los datos a la semilla de 80 000 reservas, elimina las altas de prueba y calienta la API. Se elige un número libre para conservar todas las corridas anteriores.
+
+~~~powershell
+$numero = 101
+while (Test-Path -LiteralPath (Join-Path $proyecto "resultados\despues\humo-$numero")) { $numero++ }
+python .\scripts\medir.py despues humo $numero
+$salida = $LASTEXITCODE
+$carpeta = Join-Path $proyecto "resultados\despues\humo-$numero"
+if (Test-Path -LiteralPath "$carpeta\resumen.txt") { Get-Content -LiteralPath "$carpeta\resumen.txt" -Encoding UTF8 }
+~~~
+
+El humo dura 20 segundos. El código `0` indica que terminó y cumplió sus umbrales. Para abrir los archivos originales desde esa misma ventana:
+
+~~~powershell
+Get-Content -LiteralPath "$carpeta\k6.txt" -Encoding UTF8
+Get-Content -LiteralPath "$carpeta\ejecucion.json" -Raw -Encoding UTF8 | ConvertFrom-Json | Select-Object salida,aborto
+~~~
+
+Si aparece un aborto, revisa `recursos.csv`. El monitor interrumpe la corrida cuando la CPU del equipo supera el 90 % o quedan menos de 2 GiB disponibles durante 10 segundos. Espera a que el equipo recupere margen, comprueba `/salud` y repite el bloque completo del paso 6 para usar otro número. El resumen de k6 puede quedar vacío si el monitor interrumpe el proceso. Para apagar el sistema al terminar, vuelve al paso 1.
+
+## Repetir la comparación completa antes y después
+
+Esta sección es opcional para quien solo quiera iniciar el sistema. Mantén las ventanas A y B abiertas. Ejecuta los bloques en **C, PowerShell, raíz del proyecto**, tras configurar k6 en el paso 5. Define primero dos funciones de sesión para escoger identificadores libres y detener la secuencia si un comando falla:
+
+~~~powershell
+function Ejecutar-Python {
+    python @args
+    if ($LASTEXITCODE -ne 0) { throw "El comando terminó con código $LASTEXITCODE. Revisa la salida antes de continuar." }
+}
+function Medir-Corrida($version, $modo) {
+    $n = 101
+    while (Test-Path -LiteralPath (Join-Path $proyecto "resultados\$version\$modo-$n")) { $n++ }
+    Ejecutar-Python .\scripts\medir.py $version $modo $n
+}
+~~~
+
+**Primero, medir la versión inicial.** Con los clientes de prueba detenidos, quita el índice de la práctica en la base `s15_reservas`. Ejecuta desde PowerShell:
+
+~~~powershell
+wsl -d Ubuntu -u postgres -- psql -v ON_ERROR_STOP=1 -d s15_reservas -c 'DROP INDEX IF EXISTS reservas_orden_inicio_id;'
+if ($LASTEXITCODE -ne 0) { throw 'Revisa la conexión a PostgreSQL antes de medir.' }
+Ejecutar-Python .\scripts\preparar.py restablecer
+Ejecutar-Python .\scripts\preparar.py diagnosticar
+Ejecutar-Python .\scripts\regresion.py
+Medir-Corrida antes humo
+1..3 | ForEach-Object { Medir-Corrida antes carga }
+Medir-Corrida antes estres
+~~~
+
+**Después, aplicar la corrección y repetir las mediciones.** En C y desde la misma carpeta:
+
+~~~powershell
+Ejecutar-Python .\scripts\preparar.py restablecer
+Ejecutar-Python .\scripts\preparar.py corregir
+Ejecutar-Python .\scripts\preparar.py diagnosticar
+Ejecutar-Python .\scripts\regresion.py
+Medir-Corrida despues humo
+1..3 | ForEach-Object { Medir-Corrida despues carga }
+Medir-Corrida despues estres
+Ejecutar-Python .\scripts\resumir.py
+~~~
+
+El escenario de estrés termina con una etapa de recuperación a 2 operaciones/s. Si se aborta una medición, revisa su motivo antes de continuar y verifica la recuperación con humo de la misma versión. Cada corrida escribe en `resultados\<versión>\<escenario>-<número>\`. El último comando regenera el archivo derivado `resultados\comparacion.csv`. Los umbrales, la mezcla y el calentamiento se describen en [el plan de pruebas](PLAN.md).
+
+## Contrato
+- GET /disponibilidad acepta recurso, inicio y fin con zona horaria. Devuelve disponible. El inicio es inclusivo y el fin exclusivo.
+- POST /reservas recibe el mismo objeto JSON. Devuelve 201 y la fila creada; 409 si se traslapa; 400 si el intervalo es inválido; 404 si la sala no existe.
+- GET /reservas?pagina=1&limite=10 permite 1–100 filas por página. Orden descendente por inicio y luego por id. Los datos reflejan la base al momento de cada consulta. Si hay escrituras entre dos páginas, su contenido puede moverse.
+- Los datos se generan con una fórmula determinista, sin azar ni datos personales: 80 salas × 1 000 intervalos consecutivos de una hora, ocupados durante los primeros 30 minutos.
+
+## Instalación inicial en otro equipo
+
+
 Se probó con Python 3.12 para Windows, PostgreSQL 18.6 en Ubuntu bajo WSL2 y k6 2.3.0 para Windows. Flask despacha las rutas, Waitress sirve HTTP local con ocho hilos y psycopg usa un pool de dos a ocho conexiones. PostgreSQL aplica la regla de exclusión de horarios incluso ante escrituras concurrentes. La separación permite observar los procesos de API, generador y base. Sin contenedores. Solo la API escucha en 127.0.0.1:8765.
 
 ### 1. Ubicar el proyecto en Windows
@@ -47,12 +196,12 @@ Deja Ubuntu abierto durante la práctica.
 
 ### 3. Preparar Python y los datos — terminal 2, PowerShell
 
-Abre otra terminal en Windows. En la **raíz del proyecto**, crea el entorno e instala las dependencias una vez. Se requiere Python 3.12 en Windows:
+Abre otra terminal en Windows. En la **raíz del proyecto**, comprueba Python e instala las dependencias una vez. Se requiere Python 3.12 en Windows:
 
 ~~~powershell
 Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
-python -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -r .\requirements.txt
+python --version
+python -m pip install -r .\requirements.txt
 ~~~
 
 En esta misma raíz, la aplicación y los scripts leen la conexión desde el archivo local `.dsn`, excluido de Git. Si ya está configurado, continúa al siguiente bloque. Para crearlo por primera vez en **PowerShell**, introduce la contraseña del rol `s15` cuando se solicite:
@@ -66,96 +215,10 @@ Set-Content -LiteralPath .\.dsn -Encoding ascii -Value "postgresql://s15:$claveU
 Si prefieres configurar `DATABASE_URL`, esa variable tiene prioridad sobre `.dsn` y debe estar disponible en **ambas** terminales PowerShell. Solo para una **base vacía**, carga las 80 salas y las 80 000 reservas desde **PowerShell, raíz del proyecto**:
 
 ~~~powershell
-.\.venv\Scripts\python.exe .\scripts\preparar.py instalar
+python .\scripts\preparar.py instalar
 ~~~
 
-### 4. Arrancar la API — terminal 2, PowerShell
-
-En cada arranque, con PostgreSQL activo, ejecuta desde la **raíz del proyecto** y deja abierta esta terminal. Para detener la API al terminar usa Ctrl+C aquí.
-
-~~~powershell
-Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
-.\.venv\Scripts\python.exe .\app.py
-~~~
-
-### 5. Verificar la API — terminal 3, PowerShell
-
-Abre **otra ventana PowerShell**. Esta será la terminal para todas las pruebas. Sitúate en la **misma raíz**:
-
-~~~powershell
-Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
-Invoke-RestMethod http://127.0.0.1:8765/salud
-~~~
-
-La respuesta esperada contiene `estado` con valor `ok`. Instala k6 para Windows desde las [publicaciones oficiales](https://github.com/grafana/k6/releases). Si está en el PATH, comprueba la instalación con `k6 version` en esta terminal. Si descargaste el ZIP, ejecuta aquí las dos líneas siguientes sustituyendo la ruta de ejemplo por la de tu ejecutable:
-
-~~~powershell
-$env:K6_BIN = 'C:\herramientas\k6\k6.exe'
-& $env:K6_BIN version
-~~~
-
-## Contrato
-- GET /disponibilidad acepta recurso, inicio y fin con zona horaria. Devuelve disponible. El inicio es inclusivo y el fin exclusivo.
-- POST /reservas recibe el mismo objeto JSON. Devuelve 201 y la fila creada; 409 si se traslapa; 400 si el intervalo es inválido; 404 si la sala no existe.
-- GET /reservas?pagina=1&limite=10 permite 1–100 filas por página. Orden descendente por inicio y luego por id. Los datos reflejan la base al momento de cada consulta. Si hay escrituras entre dos páginas, su contenido puede moverse.
-- Los datos se generan con una fórmula determinista, sin azar ni datos personales: 80 salas × 1 000 intervalos consecutivos de una hora, ocupados durante los primeros 30 minutos.
-
-## Repetir el experimento
-Ejecuta los bloques en orden. Mantén PostgreSQL en la terminal 1 y la API en la terminal 2. Usa **PowerShell en la terminal 3, desde la raíz del proyecto**, para las pruebas. Los identificadores 101–103 dejan libres las evidencias originales. Si ya existen carpetas con esos números, elige números nuevos para esa repetición.
-
-**Preparar la línea base.** Si instalaste la semilla en una base vacía, continúa directamente con la regresión. Si la base ya tiene la corrección, antes de volver a medir «antes» ejecuta este bloque en **Ubuntu, terminal 1**, desde cualquier carpeta. Asegúrate de que ninguna prueba esté en curso:
-
-~~~bash
-cd ~
-sudo -u postgres psql -d s15_reservas -c 'DROP INDEX IF EXISTS reservas_orden_inicio_id;'
-~~~
-
-**Medir la versión inicial.** En **PowerShell, terminal 3**, desde la raíz:
-
-~~~powershell
-Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
-.\.venv\Scripts\python.exe .\scripts\regresion.py
-.\.venv\Scripts\python.exe .\scripts\medir.py antes humo 101
-101..103 | ForEach-Object { .\.venv\Scripts\python.exe .\scripts\medir.py antes carga $_; if ($LASTEXITCODE -ne 0) { throw "Revisar corrida $_" } }
-.\.venv\Scripts\python.exe .\scripts\medir.py antes estres 101
-~~~
-
-**Aplicar la corrección.** En **la misma PowerShell, terminal 3**, desde la raíz y con los clientes de carga detenidos:
-
-~~~powershell
-.\.venv\Scripts\python.exe .\scripts\preparar.py restablecer
-.\.venv\Scripts\python.exe .\scripts\preparar.py diagnosticar
-.\.venv\Scripts\python.exe .\scripts\preparar.py corregir
-.\.venv\Scripts\python.exe .\scripts\preparar.py diagnosticar
-.\.venv\Scripts\python.exe .\scripts\regresion.py
-~~~
-
-`restablecer` elimina las altas del experimento, conserva las 80 000 reservas originales y reinicia el próximo ID en 80001. También puedes ejecutarlo por separado desde esta misma carpeta.
-
-**Medir la versión corregida.** En **PowerShell, terminal 3**, desde la raíz:
-
-~~~powershell
-.\.venv\Scripts\python.exe .\scripts\medir.py despues humo 101
-101..103 | ForEach-Object { .\.venv\Scripts\python.exe .\scripts\medir.py despues carga $_; if ($LASTEXITCODE -ne 0) { throw "Revisar corrida $_" } }
-.\.venv\Scripts\python.exe .\scripts\medir.py despues estres 101
-.\.venv\Scripts\python.exe .\scripts\resumir.py
-~~~
-
-Cada medición guarda sus archivos en `resultados\<versión>\<escenario>-<número>\` dentro de la raíz. Por ejemplo, el resumen del nuevo humo inicial queda en `resultados\antes\humo-101\k6.txt`. El último comando regenera `resultados\comparacion.csv` con todas las corridas disponibles, incluidas las originales. El campo `corrida` permite identificar las nuevas.
-
-### Leer una corrida en Windows PowerShell 5.1
-
-Cada nueva medición crea un `resumen.txt` en español que PowerShell 5.1 reconoce automáticamente. Para cualquier corrida anterior, también puedes mostrar esa vista directamente. Desde la raíz del proyecto:
-
-~~~powershell
-python .\scripts\leer_corrida.py .\resultados\despues\carga-1
-~~~
-
-Si quieres inspeccionar el registro original, usa `Get-Content -Encoding UTF8` con la ruta absoluta a `k6.txt`. Para leer el motivo de una interrupción en `ejecucion.json`, pasa el contenido a `ConvertFrom-Json` antes de mostrar el campo `aborto`.
-
-El script k6/reservas.js contiene los tres escenarios. El ejecutor aplica el límite de recursos del host, conserva el log, el código de salida, la serie JSON comprimida y las muestras de recursos aproximadamente cada dos segundos. Tras un aborto por seguridad esperar hasta recuperar el margen de CPU/RAM, revisar /salud y ejecutar humo con un nuevo número. En k6.txt se encuentra la evaluación de thresholds; comparacion.csv se reconstruye a partir de las series. En CPU de proceso, 100 % equivale a un procesador lógico; las cifras de RSS de PostgreSQL pueden contar páginas compartidas más de una vez. Las tasas por fase en el CSV se calculan con su duración nominal. k6 puede iniciar una iteración junto al límite de una etapa.
-
-Documentación del ejecutor y criterios: https://grafana.com/docs/k6/latest/ y https://grafana.com/docs/k6/latest/using-k6/thresholds/
+Al terminar en una base nueva, ejecuta la comparación completa para medir la línea base y aplicar el índice, o aplica la versión corregida con `python .\scripts\preparar.py corregir` desde PowerShell en la raíz. Para iniciar la API sigue el paso 3. Descarga k6 desde las [publicaciones oficiales](https://github.com/grafana/k6/releases/tag/v2.3.0).
 
 ## Evidencias para revisión
 - Informe editable: [Informe S15.docx](./Informe%20S15.docx). Video narrado: [descargar MP4](https://github.com/mchiroyl/construir-medir-y-mejorar-una-API/releases/download/entrega/Video-S15.mp4).
