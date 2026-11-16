@@ -143,6 +143,16 @@ Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API
 
 Cada medición guarda sus archivos en `resultados\<versión>\<escenario>-<número>\` dentro de la raíz. Por ejemplo, el resumen del nuevo humo inicial queda en `resultados\antes\humo-101\k6.txt`. El último comando regenera `resultados\comparacion.csv` con todas las corridas disponibles, incluidas las originales. El campo `corrida` permite identificar las nuevas.
 
+### Leer una corrida en Windows PowerShell 5.1
+
+Cada nueva medición crea un `resumen.txt` en español que PowerShell 5.1 reconoce automáticamente. Para cualquier corrida anterior, también puedes mostrar esa vista directamente. Desde la raíz del proyecto:
+
+~~~powershell
+python .\scripts\leer_corrida.py .\resultados\despues\carga-1
+~~~
+
+Si quieres inspeccionar el registro original, usa `Get-Content -Encoding UTF8` con la ruta absoluta a `k6.txt`. Para leer el motivo de una interrupción en `ejecucion.json`, pasa el contenido a `ConvertFrom-Json` antes de mostrar el campo `aborto`.
+
 El script k6/reservas.js contiene los tres escenarios. El ejecutor aplica el límite de recursos del host, conserva el log, el código de salida, la serie JSON comprimida y las muestras de recursos aproximadamente cada dos segundos. Tras un aborto por seguridad esperar hasta recuperar el margen de CPU/RAM, revisar /salud y ejecutar humo con un nuevo número. En k6.txt se encuentra la evaluación de thresholds; comparacion.csv se reconstruye a partir de las series. En CPU de proceso, 100 % equivale a un procesador lógico; las cifras de RSS de PostgreSQL pueden contar páginas compartidas más de una vez. Las tasas por fase en el CSV se calculan con su duración nominal. k6 puede iniciar una iteración junto al límite de una etapa.
 
 Documentación del ejecutor y criterios: https://grafana.com/docs/k6/latest/ y https://grafana.com/docs/k6/latest/using-k6/thresholds/

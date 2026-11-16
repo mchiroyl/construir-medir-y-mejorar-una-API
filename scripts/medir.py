@@ -2,6 +2,7 @@ import argparse, csv, gzip, json, os, shutil, subprocess, time
 from datetime import datetime,timezone
 from pathlib import Path
 import psutil, psycopg, requests
+from leer_corrida import resumen
 
 parser=argparse.ArgumentParser()
 parser.add_argument("version",choices=["antes","despues"])
@@ -57,6 +58,7 @@ with (dest/"k6.txt").open("w",encoding="utf-8") as log,(dest/"recursos.csv").ope
     meta["salida"]=p.wait()
 meta["fin"]=datetime.now(timezone.utc).isoformat()
 (dest/"ejecucion.json").write_text(json.dumps(meta,indent=2),encoding="utf-8")
+(dest/"resumen.txt").write_text(resumen(dest) + "\n", encoding="utf-8-sig")
 print(dest, meta["salida"],flush=True)
 raise SystemExit(0 if meta["salida"]==0 else 1)
 
