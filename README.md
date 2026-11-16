@@ -5,20 +5,94 @@ Proyecto individual de Marvin Chiroy Lopreto, carné 2890-22-20336. El informe e
 ## Preparar el laboratorio
 Se probó con Python 3.12 para Windows, PostgreSQL 18.6 en Ubuntu bajo WSL2 y k6 2.3.0 para Windows. Flask despacha las rutas, Waitress sirve HTTP local con ocho hilos y psycopg usa un pool de dos a ocho conexiones. PostgreSQL aplica la regla de exclusión de horarios incluso ante escrituras concurrentes. La separación permite observar los procesos de API, generador y base. Sin contenedores. Solo la API escucha en 127.0.0.1:8765.
 
-1. Clonar este repositorio y entrar al directorio. Para reconstruir únicamente el estado inicial usar una copia en la etiqueta `antes`. La semilla y el esquema inicial también están disponibles en la rama principal.
-2. Instalar Python 3.12, k6 y PostgreSQL con el módulo btree_gist. Para repetir el muestreo de recursos, ejecutar Python y k6 en Windows y PostgreSQL en una distribución WSL2 llamada Ubuntu. En Ubuntu: `sudo apt install postgresql postgresql-contrib`; iniciar PostgreSQL con `sudo service postgresql start`. Mantener Ubuntu activo durante la práctica. Comprobar que PostgreSQL escuche localmente en 5432. Descargar k6 desde las publicaciones oficiales de Grafana, agregarlo al PATH o asignar su ruta completa a la variable K6_BIN. Verificar con `k6 version`.
-3. Crear una base exclusiva. En Ubuntu ejecutar `sudo -u postgres createuser --pwprompt s15` y `sudo -u postgres createdb --owner=s15 s15_reservas`. Guardar la URI de conexión en la variable de sesión DATABASE_URL o en un archivo local .dsn (excluido de Git). Formato: `postgresql://s15:CLAVE@127.0.0.1:5432/s15_reservas`. Codificar los caracteres reservados de la contraseña para una URI.
-4. Desde PowerShell, instalar las dependencias y el conjunto ficticio. En una base vacía ejecutar:
+### 1. Ubicar el proyecto en Windows
+
+En la PC de la entrega, abre **PowerShell** y ejecuta desde cualquier carpeta:
 
 ~~~powershell
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-python scripts/preparar.py instalar
-python app.py
+Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+Get-Item -LiteralPath .\app.py, .\requirements.txt
 ~~~
 
-En una segunda consola activar el mismo entorno y verificar `Invoke-RestMethod http://127.0.0.1:8765/salud`. Instalar se ejecuta una vez por base vacía. Para volver al conjunto inicial durante las pruebas, detener los clientes y ejecutar `python scripts/preparar.py restablecer`. Este comando elimina las altas del experimento, conserva las 80 000 reservas originales y reinicia el próximo ID en 80001. Para restablecer el esquema inicial tras la corrección quitar únicamente el índice de la práctica con `DROP INDEX IF EXISTS reservas_orden_inicio_id` en s15_reservas.
+Esa es la **raíz del proyecto**. Usa `-LiteralPath` porque el nombre incluye corchetes. Si estás en otro equipo, puedes clonar desde **PowerShell**, empezando en tu carpeta de usuario:
+
+~~~powershell
+Set-Location -LiteralPath $HOME
+git clone https://github.com/mchiroyl/construir-medir-y-mejorar-una-API.git reservas-s15
+Set-Location -LiteralPath .\reservas-s15
+~~~
+
+En ese caso, usa la carpeta `reservas-s15` que acabas de crear en cada bloque que indique «raíz». Las rutas `scripts\`, `k6\`, `db\` y `resultados\` parten de esa raíz. El ejecutor busca allí el script k6 y guarda allí los resultados.
+
+### 2. Iniciar PostgreSQL — terminal 1, Ubuntu en WSL2
+
+Abre **Ubuntu**. Puedes empezar en cualquier carpeta de Linux. La instalación de paquetes se hace una vez. En los siguientes arranques basta con iniciar PostgreSQL y comprobar que acepta conexiones:
+
+~~~bash
+cd ~
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+sudo service postgresql start
+pg_isready -h 127.0.0.1 -p 5432
+~~~
+
+Solo la primera vez, si el rol y la base aún no existen, ejecuta en **la misma terminal Ubuntu**, desde `~`:
+
+~~~bash
+sudo -u postgres createuser --pwprompt s15
+sudo -u postgres createdb --owner=s15 s15_reservas
+~~~
+
+Deja Ubuntu abierto durante la práctica.
+
+### 3. Preparar Python y los datos — terminal 2, PowerShell
+
+Abre otra terminal en Windows. En la **raíz del proyecto**, crea el entorno e instala las dependencias una vez. Se requiere Python 3.12 en Windows:
+
+~~~powershell
+Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r .\requirements.txt
+~~~
+
+En esta misma raíz, la aplicación y los scripts leen la conexión desde el archivo local `.dsn`, excluido de Git. Si ya está configurado, continúa al siguiente bloque. Para crearlo por primera vez en **PowerShell**, introduce la contraseña del rol `s15` cuando se solicite:
+
+~~~powershell
+$credencial = Get-Credential -UserName s15 -Message 'Contraseña del rol s15 de PostgreSQL'
+$claveUri = [Uri]::EscapeDataString($credencial.GetNetworkCredential().Password)
+Set-Content -LiteralPath .\.dsn -Encoding ascii -Value "postgresql://s15:$claveUri@127.0.0.1:5432/s15_reservas"
+~~~
+
+Si prefieres configurar `DATABASE_URL`, esa variable tiene prioridad sobre `.dsn` y debe estar disponible en **ambas** terminales PowerShell. Solo para una **base vacía**, carga las 80 salas y las 80 000 reservas desde **PowerShell, raíz del proyecto**:
+
+~~~powershell
+.\.venv\Scripts\python.exe .\scripts\preparar.py instalar
+~~~
+
+### 4. Arrancar la API — terminal 2, PowerShell
+
+En cada arranque, con PostgreSQL activo, ejecuta desde la **raíz del proyecto** y deja abierta esta terminal. Para detener la API al terminar usa Ctrl+C aquí.
+
+~~~powershell
+Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+.\.venv\Scripts\python.exe .\app.py
+~~~
+
+### 5. Verificar la API — terminal 3, PowerShell
+
+Abre **otra ventana PowerShell**. Esta será la terminal para todas las pruebas. Sitúate en la **misma raíz**:
+
+~~~powershell
+Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+Invoke-RestMethod http://127.0.0.1:8765/salud
+~~~
+
+La respuesta esperada contiene `estado` con valor `ok`. Instala k6 para Windows desde las [publicaciones oficiales](https://github.com/grafana/k6/releases). Si está en el PATH, comprueba la instalación con `k6 version` en esta terminal. Si descargaste el ZIP, ejecuta aquí las dos líneas siguientes sustituyendo la ruta de ejemplo por la de tu ejecutable:
+
+~~~powershell
+$env:K6_BIN = 'C:\herramientas\k6\k6.exe'
+& $env:K6_BIN version
+~~~
 
 ## Contrato
 - GET /disponibilidad acepta recurso, inicio y fin con zona horaria. Devuelve disponible. El inicio es inclusivo y el fin exclusivo.
@@ -27,23 +101,47 @@ En una segunda consola activar el mismo entorno y verificar `Invoke-RestMethod h
 - Los datos se generan con una fórmula determinista, sin azar ni datos personales: 80 salas × 1 000 intervalos consecutivos de una hora, ocupados durante los primeros 30 minutos.
 
 ## Repetir el experimento
-Ejecutar desde la raíz con la API activa. Usar un nuevo número de corrida si la carpeta ya existe: el ejecutor protege los originales. Para una reproducción limpia, clonar en otra carpeta y mover la carpeta resultados original a otra ubicación antes de medir. El ejecutor prepara los datos y calienta cada vez. No ejecutar pruebas simultáneas.
- 
-~~~powershell
-python scripts/regresion.py
-python scripts/medir.py antes humo 1
-1..3 | ForEach-Object { python scripts/medir.py antes carga $_ }
-python scripts/medir.py antes estres 1
-python scripts/preparar.py restablecer
-python scripts/preparar.py diagnosticar
-python scripts/preparar.py corregir
-python scripts/preparar.py diagnosticar
-python scripts/regresion.py
-python scripts/medir.py despues humo 1
-1..3 | ForEach-Object { python scripts/medir.py despues carga $_ }
-python scripts/medir.py despues estres 1
-python scripts/resumir.py
+Ejecuta los bloques en orden. Mantén PostgreSQL en la terminal 1 y la API en la terminal 2. Usa **PowerShell en la terminal 3, desde la raíz del proyecto**, para las pruebas. Los identificadores 101–103 dejan libres las evidencias originales. Si ya existen carpetas con esos números, elige números nuevos para esa repetición.
+
+**Preparar la línea base.** Si instalaste la semilla en una base vacía, continúa directamente con la regresión. Si la base ya tiene la corrección, antes de volver a medir «antes» ejecuta este bloque en **Ubuntu, terminal 1**, desde cualquier carpeta. Asegúrate de que ninguna prueba esté en curso:
+
+~~~bash
+cd ~
+sudo -u postgres psql -d s15_reservas -c 'DROP INDEX IF EXISTS reservas_orden_inicio_id;'
 ~~~
+
+**Medir la versión inicial.** En **PowerShell, terminal 3**, desde la raíz:
+
+~~~powershell
+Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+.\.venv\Scripts\python.exe .\scripts\regresion.py
+.\.venv\Scripts\python.exe .\scripts\medir.py antes humo 101
+101..103 | ForEach-Object { .\.venv\Scripts\python.exe .\scripts\medir.py antes carga $_; if ($LASTEXITCODE -ne 0) { throw "Revisar corrida $_" } }
+.\.venv\Scripts\python.exe .\scripts\medir.py antes estres 101
+~~~
+
+**Aplicar la corrección.** En **la misma PowerShell, terminal 3**, desde la raíz y con los clientes de carga detenidos:
+
+~~~powershell
+.\.venv\Scripts\python.exe .\scripts\preparar.py restablecer
+.\.venv\Scripts\python.exe .\scripts\preparar.py diagnosticar
+.\.venv\Scripts\python.exe .\scripts\preparar.py corregir
+.\.venv\Scripts\python.exe .\scripts\preparar.py diagnosticar
+.\.venv\Scripts\python.exe .\scripts\regresion.py
+~~~
+
+`restablecer` elimina las altas del experimento, conserva las 80 000 reservas originales y reinicia el próximo ID en 80001. También puedes ejecutarlo por separado desde esta misma carpeta.
+
+**Medir la versión corregida.** En **PowerShell, terminal 3**, desde la raíz:
+
+~~~powershell
+.\.venv\Scripts\python.exe .\scripts\medir.py despues humo 101
+101..103 | ForEach-Object { .\.venv\Scripts\python.exe .\scripts\medir.py despues carga $_; if ($LASTEXITCODE -ne 0) { throw "Revisar corrida $_" } }
+.\.venv\Scripts\python.exe .\scripts\medir.py despues estres 101
+.\.venv\Scripts\python.exe .\scripts\resumir.py
+~~~
+
+Cada medición guarda sus archivos en `resultados\<versión>\<escenario>-<número>\` dentro de la raíz. Por ejemplo, el resumen del nuevo humo inicial queda en `resultados\antes\humo-101\k6.txt`. El último comando regenera `resultados\comparacion.csv` con todas las corridas disponibles, incluidas las originales. El campo `corrida` permite identificar las nuevas.
 
 El script k6/reservas.js contiene los tres escenarios. El ejecutor aplica el límite de recursos del host, conserva el log, el código de salida, la serie JSON comprimida y las muestras de recursos aproximadamente cada dos segundos. Tras un aborto por seguridad esperar hasta recuperar el margen de CPU/RAM, revisar /salud y ejecutar humo con un nuevo número. En k6.txt se encuentra la evaluación de thresholds; comparacion.csv se reconstruye a partir de las series. En CPU de proceso, 100 % equivale a un procesador lógico; las cifras de RSS de PostgreSQL pueden contar páginas compartidas más de una vez. Las tasas por fase en el CSV se calculan con su duración nominal. k6 puede iniciar una iteración junto al límite de una etapa.
 
