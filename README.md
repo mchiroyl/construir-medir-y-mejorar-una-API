@@ -40,7 +40,8 @@ wsl -d Ubuntu
 **Ventana B · abre otra PowerShell.** Sitúate en la carpeta exacta del proyecto. Las comillas y `-LiteralPath` permiten usar los espacios y los corchetes del nombre.
 
 ~~~powershell
-Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+$proyecto = 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+Set-Location -LiteralPath $proyecto
 python .\app.py
 ~~~
 
@@ -141,7 +142,7 @@ Medir-Corrida despues estres
 Ejecutar-Python .\scripts\resumir.py
 ~~~
 
-El escenario de estrés termina con una etapa de recuperación a 2 operaciones/s. Si se aborta una medición, revisa su motivo antes de continuar y verifica la recuperación con humo de la misma versión. Cada corrida escribe en `resultados\<versión>\<escenario>-<número>\`. El último comando regenera el archivo derivado `resultados\comparacion.csv`. Los umbrales, la mezcla y el calentamiento se describen en [el plan de pruebas](PLAN.md).
+El escenario de estrés termina con una etapa de recuperación a 2 operaciones/s. Si se aborta una medición, revisa su motivo antes de continuar y verifica la recuperación con humo de la misma versión. Cada corrida escribe en `resultados\<versión>\<escenario>-<número>\`. Las corridas interrumpidas por seguridad se anuncian en la consola y se excluyen de los percentiles. El último comando regenera el archivo derivado `resultados\comparacion.csv`. Los umbrales, la mezcla y el calentamiento se describen en [el plan de pruebas](PLAN.md).
 
 ## Contrato
 - GET /disponibilidad acepta recurso, inicio y fin con zona horaria. Devuelve disponible. El inicio es inclusivo y el fin exclusivo.
@@ -159,8 +160,9 @@ Se probó con Python 3.12 para Windows, PostgreSQL 18.6 en Ubuntu bajo WSL2 y k6
 En la PC de la entrega, abre **PowerShell** y ejecuta desde cualquier carpeta:
 
 ~~~powershell
-Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
-Get-Item -LiteralPath .\app.py, .\requirements.txt
+$proyecto = 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+Set-Location -LiteralPath $proyecto
+Get-Item -LiteralPath "$proyecto\app.py", "$proyecto\requirements.txt" | Select-Object Name
 ~~~
 
 Esa es la **raíz del proyecto**. Usa `-LiteralPath` porque el nombre incluye corchetes. Si estás en otro equipo, puedes clonar desde **PowerShell**, empezando en tu carpeta de usuario:
@@ -168,7 +170,8 @@ Esa es la **raíz del proyecto**. Usa `-LiteralPath` porque el nombre incluye co
 ~~~powershell
 Set-Location -LiteralPath $HOME
 git clone https://github.com/mchiroyl/construir-medir-y-mejorar-una-API.git reservas-s15
-Set-Location -LiteralPath .\reservas-s15
+$proyecto = Join-Path $HOME 'reservas-s15'
+Set-Location -LiteralPath $proyecto
 ~~~
 
 En ese caso, usa la carpeta `reservas-s15` que acabas de crear en cada bloque que indique «raíz». Las rutas `scripts\`, `k6\`, `db\` y `resultados\` parten de esa raíz. El ejecutor busca allí el script k6 y guarda allí los resultados.
@@ -199,7 +202,8 @@ Deja Ubuntu abierto durante la práctica.
 Abre otra terminal en Windows. En la **raíz del proyecto**, comprueba Python e instala las dependencias una vez. Se requiere Python 3.12 en Windows:
 
 ~~~powershell
-Set-Location -LiteralPath 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+$proyecto = 'D:\UMG\QA\[S15] k6 construir, medir y mejorar una API'
+Set-Location -LiteralPath $proyecto
 python --version
 python -m pip install -r .\requirements.txt
 ~~~
@@ -209,7 +213,7 @@ En esta misma raíz, la aplicación y los scripts leen la conexión desde el arc
 ~~~powershell
 $credencial = Get-Credential -UserName s15 -Message 'Contraseña del rol s15 de PostgreSQL'
 $claveUri = [Uri]::EscapeDataString($credencial.GetNetworkCredential().Password)
-Set-Content -LiteralPath .\.dsn -Encoding ascii -Value "postgresql://s15:$claveUri@127.0.0.1:5432/s15_reservas"
+Set-Content -LiteralPath "$proyecto\.dsn" -Encoding ascii -Value "postgresql://s15:$claveUri@127.0.0.1:5432/s15_reservas"
 ~~~
 
 Si prefieres configurar `DATABASE_URL`, esa variable tiene prioridad sobre `.dsn` y debe estar disponible en **ambas** terminales PowerShell. Solo para una **base vacía**, carga las 80 salas y las 80 000 reservas desde **PowerShell, raíz del proyecto**:

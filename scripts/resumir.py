@@ -14,6 +14,10 @@ for folder in sorted(Path("resultados").glob("*/*")):
     meta=folder/"ejecucion.json"
     if not meta.exists():
         continue
+    motivo = json.loads(meta.read_text(encoding="utf-8")).get("aborto")
+    if motivo:
+        print(f"{folder}: corrida interrumpida ({motivo}). Se omite de la comparación.")
+        continue
     dur=defaultdict(list)
     counts=defaultdict(lambda:defaultdict(float))
     for line in gzip.open(folder/"serie.json.gz","rt",encoding="utf8"):
@@ -34,6 +38,8 @@ for folder in sorted(Path("resultados").glob("*/*")):
                          p99=round(percentile(values,.99),3),req_por_s=round(len(values)/secs,3),
                          iteraciones=c["iterations"] if op=="todas" else "",errores=c["http_req_failed"] if op=="todas" else "",
                          descartadas=c["dropped_iterations"] if op=="todas" else "",checks_ok=c["checks"] if op=="todas" else ""))
+if not rows:
+    raise SystemExit("No hay mediciones completas para generar la comparación.")
 with Path("resultados/comparacion.csv").open("w",newline="",encoding="utf-8") as f:
     writer=csv.DictWriter(f,fieldnames=list(rows[0]))
     writer.writeheader();writer.writerows(rows)
